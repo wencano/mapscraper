@@ -1,10 +1,9 @@
 #!/bin/sh
 set -e
 
-echo "[mapscraper] Waiting for database..."
-# Simple retry loop for Postgres readiness
+echo "[mapscraper] Waiting for database / running migrations..."
 i=0
-until npx prisma migrate deploy; do
+until ./node_modules/.bin/prisma migrate deploy; do
   i=$((i + 1))
   if [ "$i" -ge 30 ]; then
     echo "[mapscraper] Migrations failed after 30 attempts"
@@ -15,4 +14,4 @@ until npx prisma migrate deploy; do
 done
 
 echo "[mapscraper] Starting Next.js on ${HOSTNAME:-0.0.0.0}:${PORT:-3000}"
-exec node server.js
+exec ./node_modules/.bin/next start -H "${HOSTNAME:-0.0.0.0}" -p "${PORT:-3000}"

@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Dokploy / production image for MapScraper (Next.js standalone + Prisma)
+# Dokploy / production image for MapScraper
 
 FROM node:20-bookworm-slim AS base
 RUN apt-get update \
@@ -7,25 +7,31 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
-# --- deps ---
+# --- deps for build (includes TypeScript / Tailwind) ---
 FROM base AS deps
-# Ensure TypeScript/ESLint (devDependencies) are installed even if CI sets NODE_ENV=production
 ENV NODE_ENV=development
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
 RUN npm ci
 
-# --- build ---
+# --- build Next.js ---
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
-# Prisma schema requires DATABASE_URL at generate/build time (no live DB needed)
 ENV DATABASE_URL="postgresql://mapscraper:mapscraper@db:5432/mapscraper?schema=public"
 RUN npx prisma generate && npm run build
 
-# --- runner ---
+# --- production dependencies only ---
+FROM base AS prod-deps
+ENV NODE_ENV=production
+ENV DATABASE_URL="postgresql://mapscraper:mapscraper@db:5432/mapscraper?schema=public"
+COPY package.json package-lock.json ./
+COPY prisma ./prisma
+RUN npm ci --omit=dev && npx prisma generate
+
+# --- runner (no npm install here — copy finished artifacts only) ---
 FROM base AS runner
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -35,18 +41,14 @@ ENV HOSTNAME=0.0.0.0
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs
 
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=prod-deps /app/package.json ./package.json
+COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/package-lock.json ./package-lock.json
-
-# Prisma CLI for migrate deploy at container start
-RUN npm install prisma@5.22.0 --omit=dev --no-audit --no-fund \
-  && npx prisma generate
-
+COPY --from=builder /app/next.config.ts ./next.config.ts
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
+
 RUN chmod +x ./docker-entrypoint.sh \
   && chown -R nextjs:nodejs /app
 
