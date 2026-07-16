@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // Dokploy image uses `next start` with full production node_modules
 };
 
 export default nextConfig;
