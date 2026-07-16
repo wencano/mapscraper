@@ -1,0 +1,53 @@
+# Local + Dokploy compose
+# Dokploy: create a Compose project, set env vars below (or in the UI), deploy.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mapscraper}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mapscraper}
+      POSTGRES_DB: ${POSTGRES_DB:-mapscraper}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-mapscraper} -d ${POSTGRES_DB:-mapscraper}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # App reaches DB via Docker network hostname `db`.
+    # Bind to loopback only (safe on Dokploy hosts; useful for local `npm run dev`).
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    expose:
+      - "5432"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://mapscraper:mapscraper@db:5432/mapscraper?schema=public}
+      NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-MapScraper}
+      OVERPASS_URL: ${OVERPASS_URL:-https://z.overpass-api.de/api/interpreter}
+      NOMINATIM_URL: ${NOMINATIM_URL:-https://nominatim.openstreetmap.org}
+      SCRAPER_USER_AGENT: ${SCRAPER_USER_AGENT:-MapScraperDemo/1.0 (demo leadgen; contact: demo@localhost)}
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+    # Dokploy: pin to 1 replica — scrape jobs are in-process
+    deploy:
+      replicas: 1
+
+volumes:
+  pgdata:
