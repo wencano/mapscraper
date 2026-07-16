@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MapScraper — Architecture Presentation</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #171a21;
+      --ink: #e8eaed;
+      --muted: #9aa3b2;
+      --accent: #5b9fd4;
+      --accent-2: #7dcea0;
+      --line: rgba(255,255,255,0.08);
+      --notion: #2383e2;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(91,159,212,0.18), transparent 55%),
+        radial-gradient(900px 500px at 90% 0%, rgba(125,206,160,0.12), transparent 50%),
+        var(--bg);
+      color: var(--ink);
+      font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    }
+    .grain {
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      opacity: 0.04;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      z-index: 0;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(12px);
+      background: rgba(15,17,21,0.72);
+      border-bottom: 1px solid var(--line);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    header p {
+      margin: 0.15rem 0 0;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+    .nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+    .nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.78rem;
+      padding: 0.35rem 0.65rem;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      transition: 0.2s ease;
+    }
+    .nav a:hover, .nav a.active {
+      color: var(--ink);
+      border-color: var(--line);
+      background: rgba(255,255,255,0.04);
+    }
+    main {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+    .hero {
+      margin-bottom: 2.5rem;
+      animation: fadeUp 0.7s ease both;
+    }
+    .hero h2 {
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      letter-spacing: -0.03em;
+      margin: 0 0 0.75rem;
+      line-height: 1.15;
+    }
+    .hero .lede {
+      color: var(--muted);
+      max-width: 52ch;
+      line-height: 1.55;
+      font-size: 1.05rem;
+    }
+    .pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1.25rem;
+    }
+    .pill {
+      font-size: 0.75rem;
+      padding: 0.35rem 0.7rem;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      background: rgba(255,255,255,0.03);
+    }
+    .pill strong { color: var(--accent-2); font-weight: 600; }
+    section.slide {
+      margin: 2.5rem 0;
+      padding: 1.5rem;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015));
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+    section.slide.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    section.slide h3 {
+      margin: 0 0 0.35rem;
+      font-size: 1.25rem;
+      letter-spacing: -0.02em;
+    }
+    section.slide .meta {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin: 0 0 1.25rem;
+      line-height: 1.5;
+    }
+    .diagram {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 1rem;
+      overflow-x: auto;
+    }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 1rem;
+    }
+    @media (max-width: 860px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      header { flex-direction: column; align-items: flex-start; }
+    }
+    .callouts {
+      display: grid;
+      gap: 0.75rem;
+    }
+    .callout {
+      padding: 0.9rem 1rem;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: rgba(0,0,0,0.2);
+      animation: pulseBorder 4s ease-in-out infinite;
+    }
+    .callout:nth-child(2) { animation-delay: 0.6s; }
+    .callout:nth-child(3) { animation-delay: 1.2s; }
+    .callout h4 {
+      margin: 0 0 0.3rem;
+      font-size: 0.85rem;
+      color: var(--accent);
+    }
+    .callout p {
+      margin: 0;
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .flow-track {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+    .flow-step {
+      flex: 1;
+      min-width: 120px;
+      padding: 0.75rem;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: rgba(35,131,226,0.08);
+      font-size: 0.78rem;
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    .slide.visible .flow-step {
+      animation: popIn 0.45s ease forwards;
+    }
+    .slide.visible .flow-step:nth-child(1) { animation-delay: 0.1s; }
+    .slide.visible .flow-step:nth-child(2) { animation-delay: 0.25s; }
+    .slide.visible .flow-step:nth-child(3) { animation-delay: 0.4s; }
+    .slide.visible .flow-step:nth-child(4) { animation-delay: 0.55s; }
+    .slide.visible .flow-step:nth-child(5) { animation-delay: 0.7s; }
+    .flow-step span {
+      display: block;
+      color: var(--notion);
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.8rem;
+      padding: 2rem 1rem;
+      border-top: 1px solid var(--line);
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes popIn {
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes pulseBorder {
+      0%, 100% { border-color: var(--line); }
+      50% { border-color: rgba(91,159,212,0.45); }
+    }
+  </style>
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <header>
+    <div>
+      <h1>MapScraper Architecture</h1>
+      <p>Leadgen demo · Next.js · PostgreSQL · OpenStreetMap public APIs</p>
+    </div>
+    <nav class="nav">
+      <a href="#context">Context</a>
+      <a href="#containers">Containers</a>
+      <a href="#pipeline">Pipeline</a>
+      <a href="#states">States</a>
+      <a href="#data">Data</a>
+      <a href="#schedule">Schedule</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="hero">
+      <h2>Free-map leadgen, built for a crisp demo</h2>
+      <p class="lede">
+        Operators define areas and search intent. The server geocodes with Nominatim,
+        discovers POIs via Overpass, upserts leads into Postgres, and surfaces progress
+        in a Notion-styled dashboard.
+      </p>
+      <div class="pills">
+        <div class="pill"><strong>Next.js 15</strong> App Router</div>
+        <div class="pill"><strong>Prisma</strong> + PostgreSQL</div>
+        <div class="pill"><strong>Nominatim</strong> geocode</div>
+        <div class="pill"><strong>Overpass</strong> POIs</div>
+        <div class="pill"><strong>Notion DS</strong> UI</div>
+      </div>
+    </div>
+
+    <section class="slide" id="context">
+      <h3>1. System context</h3>
+      <p class="meta">Single operator talks to MapScraper; MapScraper talks to public OSM APIs and Postgres.</p>
+      <div class="grid-2">
+        <div class="diagram">
+          <pre class="mermaid">
+flowchart LR
+  OP([Demo Operator]) -->|Browser| APP[MapScraper]
+  APP --> NOM[Nominatim]
+  APP --> OVP[Overpass]
+  APP --> PG[(PostgreSQL)]
+  style APP fill:#1e3a5f,stroke:#5b9fd4,color:#e8eaed
+  style PG fill:#1a3328,stroke:#7dcea0,color:#e8eaed
+  style NOM fill:#2a2438,stroke:#9aa3b2,color:#e8eaed
+  style OVP fill:#2a2438,stroke:#9aa3b2,color:#e8eaed
+          </pre>
+        </div>
+        <div class="callouts">
+          <div class="callout">
+            <h4>Demo constraint</h4>
+            <p>No Google Maps HTML scraping. Public OSM endpoints only, with polite User-Agent and rate limits.</p>
+          </div>
+          <div class="callout">
+            <h4>Why this split</h4>
+            <p>Nominatim resolves addresses → coordinates. Overpass answers “what businesses are near here?”</p>
+          </div>
+          <div class="callout">
+            <h4>Persistence</h4>
+            <p>Projects, schedules, scrape progress, and upserted leads live in PostgreSQL.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" id="containers">
+      <h3>2. Container topology</h3>
+      <p class="meta">UI polls lightweight status while a background scrape job mutates progress and leads.</p>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TB
+  subgraph Browser
+    UI[Dashboard / Modal / Detail]
+  end
+  subgraph Next["Next.js Server"]
+    RH[Route Handlers]
+    ENG[Scrape Engine]
+    TICK[Cron Tick]
+  end
+  UI -->|REST| RH
+  UI -->|1.5s poll| RH
+  RH --> ENG
+  TICK --> ENG
+  ENG --> NOM2[Nominatim]
+  ENG --> OVP2[Overpass]
+  RH --> DB[(Postgres)]
+  ENG --> DB
+  TICK --> DB
+        </pre>
+      </div>
+      <div class="flow-track">
+        <div class="flow-step"><span>01</span>Create project via modal</div>
+        <div class="flow-step"><span>02</span>Land on Ready detail</div>
+        <div class="flow-step"><span>03</span>POST scrape → 202</div>
+        <div class="flow-step"><span>04</span>Poll progress</div>
+        <div class="flow-step"><span>05</span>Done + table</div>
+      </div>
+    </section>
+
+    <section class="slide" id="pipeline">
+      <h3>3. Scrape pipeline</h3>
+      <p class="meta">Per location: geocode → Overpass radius query → map tags → upsert. Progress advances after each line.</p>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart LR
+  A[Location line] --> B[Geocode]
+  B --> C{lat/lon?}
+  C -->|yes| D[Overpass ~1.2km]
+  C -->|no| E[Skip]
+  D --> F[Normalize POIs]
+  F --> G[Upsert Lead]
+  E --> H[progress++]
+  G --> H
+  H --> I{more?}
+  I -->|yes| A
+  I -->|no| J[DONE + nextRunAt]
+        </pre>
+      </div>
+    </section>
+
+    <section class="slide" id="states">
+      <h3>4. Status state machine</h3>
+      <p class="meta">UI badges map 1:1 to `ProjectStatus`. Scraping blocks concurrent starts (409).</p>
+      <div class="diagram">
+        <pre class="mermaid">
+stateDiagram-v2
+  [*] --> READY
+  READY --> SCRAPING: run / cron
+  SCRAPING --> DONE: success
+  SCRAPING --> ERROR: failure
+  DONE --> SCRAPING: re-run
+  ERROR --> SCRAPING: retry
+  DONE --> READY: edit
+  ERROR --> READY: edit
+        </pre>
+      </div>
+    </section>
+
+    <section class="slide" id="data">
+      <h3>5. Data model</h3>
+      <p class="meta">Unique lead key `(projectId, osmType, osmId)` makes scheduled re-scrapes additive/idempotent.</p>
+      <div class="diagram">
+        <pre class="mermaid">
+erDiagram
+  PROJECT ||--o{ LEAD : has
+  PROJECT {
+    string id
+    string name
+    string searchQuery
+    string locations
+    string schedule
+    string status
+  }
+  LEAD {
+    string id
+    string osmType
+    string osmId
+    string name
+    string phone
+    string website
+  }
+        </pre>
+      </div>
+    </section>
+
+    <section class="slide" id="schedule">
+      <h3>6. Auto-scrape scheduling</h3>
+      <p class="meta">`nextRunAt` is computed from schedule enum. Tick endpoint starts due projects that are not already scraping.</p>
+      <div class="grid-2">
+        <div class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+  participant Cron
+  participant Tick as /api/cron/tick
+  participant DB
+  participant Engine
+  Cron->>Tick: POST
+  Tick->>DB: due projects
+  Tick->>Engine: start each
+  Engine->>DB: upsert leads
+          </pre>
+        </div>
+        <div class="callouts">
+          <div class="callout">
+            <h4>Intervals</h4>
+            <p>NONE · EVERY_6H · DAILY · WEEKLY — stored on the project, editable in the settings modal.</p>
+          </div>
+          <div class="callout">
+            <h4>Demo wiring</h4>
+            <p>Client can optionally ping tick; or call with curl/cron. Swap later for a real worker.</p>
+          </div>
+          <div class="callout">
+            <h4>Upsert semantics</h4>
+            <p>Existing OSM ids refresh `lastSeenAt`; brand-new POIs appear as new table rows.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    MapScraper demo architecture · open <code>architecture.md</code> for Mermaid source · see <code>spec.md</code> for requirements
+  </footer>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "dark",
+      securityLevel: "loose",
+      flowchart: { curve: "basis", padding: 16 },
+      themeVariables: {
+        primaryColor: "#1e3a5f",
+        primaryTextColor: "#e8eaed",
+        primaryBorderColor: "#5b9fd4",
+        lineColor: "#6b7280",
+        secondaryColor: "#1a3328",
+        tertiaryColor: "#2a2438",
+        background: "#171a21",
+        mainBkg: "#1e3a5f",
+        nodeBorder: "#5b9fd4",
+        clusterBkg: "#12151b",
+        titleColor: "#e8eaed",
+        edgeLabelBackground: "#171a21"
+      }
+    });
+
+    const slides = document.querySelectorAll("section.slide");
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) e.target.classList.add("visible");
+        });
+      },
+      { threshold: 0.2 }
+    );
+    slides.forEach((s) => io.observe(s));
+
+    const links = document.querySelectorAll(".nav a");
+    const spy = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (!e.isIntersecting) return;
+          links.forEach((a) => a.classList.toggle("active", a.getAttribute("href") === "#" + e.target.id));
+        });
+      },
+      { rootMargin: "-40% 0px -50% 0px" }
+    );
+    slides.forEach((s) => spy.observe(s));
+  </script>
+</body>
+</html>
