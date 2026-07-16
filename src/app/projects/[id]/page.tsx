@@ -38,9 +38,11 @@ export default function ProjectDetailPage() {
     void load();
   }, [load]);
 
+  const scrapeStatus = project?.status;
+
   // Poll while scraping
   useEffect(() => {
-    if (!project || project.status !== "SCRAPING") return;
+    if (scrapeStatus !== "SCRAPING") return;
     const t = window.setInterval(async () => {
       const res = await fetch(`/api/projects/${id}/status`);
       if (!res.ok) return;
@@ -62,7 +64,7 @@ export default function ProjectDetailPage() {
       );
     }, 1500);
     return () => window.clearInterval(t);
-  }, [project?.status, id, load]);
+  }, [scrapeStatus, id, load]);
 
   const formInitial: ProjectFormValues | undefined = useMemo(() => {
     if (!project) return undefined;

@@ -9,6 +9,8 @@ WORKDIR /app
 
 # --- deps ---
 FROM base AS deps
+# Ensure TypeScript/ESLint (devDependencies) are installed even if CI sets NODE_ENV=production
+ENV NODE_ENV=development
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
 RUN npm ci
@@ -19,6 +21,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+# Prisma schema requires DATABASE_URL at generate/build time (no live DB needed)
+ENV DATABASE_URL="postgresql://mapscraper:mapscraper@db:5432/mapscraper?schema=public"
 RUN npx prisma generate && npm run build
 
 # --- runner ---
